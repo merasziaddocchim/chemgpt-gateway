@@ -1,2 +1,10 @@
 # chemgpt-gateway
-ChemGPT API Gateway — routes and orchestrates all microservices for ChemGPT SaaS
+# chemgpt-gateway
+
+Central API gateway for ChemGPT microservices.
+
+## Routes
+
+- `/retro` → Retrosynthesis microservice
+- `/extract` → Chemical entity extraction
+- `/spectro` → Spectroscopy microservice
