@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import httpx
 import os
 
@@ -39,11 +40,15 @@ async def extract(req: Request):
         resp = await client.post(f"{EXTRACT_URL}/extract", json=body)
         return resp.json()
 
+# --- NEW: Use a Pydantic model for /spectro so Swagger UI shows an input box! ---
+class MoleculeRequest(BaseModel):
+    molecule: str
+
 @app.post("/spectro")
-async def spectro(req: Request):
-    body = await req.json()
+async def spectro(data: MoleculeRequest):
+    payload = {"molecule": data.molecule}
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{SPECTRO_URL}/spectroscopy", json=body)
+        resp = await client.post(f"{SPECTRO_URL}/spectroscopy", json=payload)
         return resp.json()
 
 # Add /chat, /auth, etc. as needed!
