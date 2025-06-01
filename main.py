@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
@@ -26,23 +26,32 @@ app.add_middleware(
 def health():
     return {"status": "ok", "service": "gateway"}
 
+# --- Models for each endpoint ---
+
+class RetroRequest(BaseModel):
+    smiles: str  # Or whatever field(s) your retrosynthesis microservice expects
+
+class ExtractRequest(BaseModel):
+    text: str
+
+class MoleculeRequest(BaseModel):
+    molecule: str
+
+# --- Updated endpoints using Pydantic models ---
+
 @app.post("/retro")
-async def retro(req: Request):
-    body = await req.json()
+async def retro(data: RetroRequest):
+    payload = {"smiles": data.smiles}
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{RETRO_URL}/retrosynthesis", json=body)
+        resp = await client.post(f"{RETRO_URL}/retrosynthesis", json=payload)
         return resp.json()
 
 @app.post("/extract")
-async def extract(req: Request):
-    body = await req.json()
+async def extract(data: ExtractRequest):
+    payload = {"text": data.text}
     async with httpx.AsyncClient() as client:
-        resp = await client.post(f"{EXTRACT_URL}/extract", json=body)
+        resp = await client.post(f"{EXTRACT_URL}/extract", json=payload)
         return resp.json()
-
-# --- NEW: Use a Pydantic model for /spectro so Swagger UI shows an input box! ---
-class MoleculeRequest(BaseModel):
-    molecule: str
 
 @app.post("/spectro")
 async def spectro(data: MoleculeRequest):
