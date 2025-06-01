@@ -75,7 +75,7 @@ async def chat_router(data: ChatRequest) -> Dict:
         payload = {"text": data.question}
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{EXTRACT_URL}/extract", json=payload)
-            answer = await resp.json()
+            answer = resp.json()  # <-- Fixed: removed await!
         return {
             "type": "extract",
             "answer": answer,
@@ -89,7 +89,7 @@ async def chat_router(data: ChatRequest) -> Dict:
         payload = {"molecule": mol}
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{SPECTRO_URL}/spectroscopy", json=payload)
-            answer = await resp.json()
+            answer = resp.json()  # <-- Fixed: removed await!
         return {
             "type": "spectro",
             "answer": answer,
@@ -107,7 +107,7 @@ async def chat_router(data: ChatRequest) -> Dict:
         payload = {"smiles": smiles}
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{RETRO_URL}/retrosynthesis", json=payload)
-            answer = await resp.json()
+            answer = resp.json()  # <-- Fixed: removed await!
         return {
             "type": "retro",
             "answer": answer,
