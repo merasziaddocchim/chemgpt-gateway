@@ -1,6 +1,7 @@
 # ==========================
 # ChemGPT Gateway Dependencies
 # ==========================
+openai>=1.0.0
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 httpx==0.25.2           # Async HTTP client to talk to microservices
