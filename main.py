@@ -5,6 +5,19 @@ import httpx
 import os
 from typing import Dict
 
+import re
+
+def is_spectro_query(q: str) -> bool:
+    # Smarter: match "spectrum", "spectra", "spectroscopy", "uv", "ir", "nmr", etc.
+    keywords = [
+        r"spectra", r"spectrum", r"spectroscopy", r"uv[- ]?vis", r"uv", r"ir", r"nmr",
+        r"mass spec", r"show.*spectrum", r"show.*spectra"
+    ]
+    for kw in keywords:
+        if re.search(kw, q):
+            return True
+    return False
+
 # Microservice URLs
 RETRO_URL = os.getenv("RETRO_URL", "https://chemgpt-se-production.up.railway.app")
 EXTRACT_URL = os.getenv("EXTRACT_URL", "https://chemgpt-extract-production.up.railway.app")
@@ -70,33 +83,45 @@ class ChatRequest(BaseModel):
 async def chat_router(data: ChatRequest) -> Dict:
     q = data.question.lower()
 
-    # === Simple rule-based router ===
+    # Extraction (compound/entity recognition)
     if "extract" in q or "compound" in q:
         payload = {"text": data.question}
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{EXTRACT_URL}/extract", json=payload)
-            answer = resp.json()  # <-- Fixed: removed await!
+            answer = await resp.json()
         return {
             "type": "extract",
             "answer": answer,
             "tool": "ChemDataExtractor"
         }
 
-    elif "spectrum" in q or "uv" in q or "ir" in q:
-        mol = q.replace("show me", "").replace("uv spectrum", "").replace("ir spectrum", "").strip()
-        if not mol or mol in ["spectrum", "uv", "ir"]:
+    # 🟣 Spectroscopy — SMART matching!
+    elif is_spectro_query(q):
+        # Try to extract molecule name after "of", or fallback to last word, or default to benzene
+        mol = None
+        match = re.search(r"(?:of|for|of the|for the)\s+([a-zA-Z0-9 \-\(\)\[\]]+)", q)
+        if match:
+            mol = match.group(1).strip()
+        else:
+            # Fallback: strip the keywords and take what's left
+            mol = re.sub(
+                r"(spectra|spectrum|spectroscopy|uv[- ]?vis|uv|ir|nmr|mass spec|show|please|plot|give|draw|for|of|the)",
+                "", q
+            ).strip()
+        if not mol or mol in ["spectrum", "spectra", "spectroscopy", "uv", "ir", "nmr"]:
             mol = "benzene"
         payload = {"molecule": mol}
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{SPECTRO_URL}/spectroscopy", json=payload)
-            answer = resp.json()  # <-- Fixed: removed await!
+            answer = await resp.json()
         return {
             "type": "spectro",
             "answer": answer,
             "tool": "ChemGPT Spectro"
         }
 
-    elif "retro" in q or "synth" in q or "route" in q or "smiles" in q:
+    # Retrosynthesis (for keywords like 'retro', 'synth', 'route', 'smiles')
+    elif any(word in q for word in ["retro", "synth", "route", "smiles"]):
         import re
         smiles = None
         match = re.search(r'([A-Za-z0-9@+\-\[\]\(\)=#$%]+)', q)
@@ -107,13 +132,14 @@ async def chat_router(data: ChatRequest) -> Dict:
         payload = {"smiles": smiles}
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{RETRO_URL}/retrosynthesis", json=payload)
-            answer = resp.json()  # <-- Fixed: removed await!
+            answer = await resp.json()
         return {
             "type": "retro",
             "answer": answer,
             "tool": "AiZynthFinder"
         }
 
+    # Fallback for unrecognized input
     else:
         return {
             "type": "unknown",
